@@ -6,7 +6,7 @@ plt.rcParams['image.interpolation'] = 'nearest'
 plt.rcParams['image.cmap'] = 'gray'
 
 
-def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, print_cost=False):  # lr was 0.009
+def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, print_cost=False, lambd=0, keep_probs=None):
     """
     Implements a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
 
@@ -17,12 +17,20 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, 
     learning_rate -- learning rate of the gradient descent update rule
     num_iterations -- number of iterations of the optimization loop
     print_cost -- if True, it prints the cost every 100 steps
+    lambd -- L2 regularization hyperparameter (0 for no L2)
+    keep_probs -- probability by layer of keeping a neuron active during drop-out (None for no drop-out)
+               -- Output layer should be always set to 1 (no drop-out)
 
     Returns:
     parameters -- parameters learnt by the model. They can then be used to predict.
     """
 
+    if keep_probs is not None:
+        assert (len(keep_probs) == len(layers_dims))
+
     np.random.seed(1)
+    n_x = X.shape[0]
+    layers_dims.insert(0, n_x)  # initialize with input (layer 0)
     costs = []  # keep track of cost
 
     # Parameters initialization.
@@ -32,13 +40,13 @@ def L_layer_model(X, Y, layers_dims, learning_rate=0.0075, num_iterations=3000, 
     for i in range(0, num_iterations):
 
         # Forward propagation: [LINEAR -> RELU]*(L-1) -> LINEAR -> SIGMOID.
-        AL, caches = L_model_forward(X, parameters)
+        AL, caches = L_model_forward(X, parameters, keep_probs)
 
         # Compute cost.
-        cost = compute_cost(AL, Y)
+        cost = compute_cost(AL, Y, parameters, lambd)
 
         # Backward propagation.
-        grads = L_model_backward(AL, Y, caches)
+        grads = L_model_backward(AL, Y, caches, lambd, keep_probs)
 
         # Update parameters.
         parameters = update_parameters(parameters, grads, learning_rate)

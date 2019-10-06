@@ -57,12 +57,15 @@ def main():
 
     n_x = train_x.shape[0]  # num_px * num_px * 3
 
-    layers_dims = [n_x, 20, 7, 5, 1]  # 4-layer model
+    layers_dims = [20, 7, 5, 1]  # 4-layer model
+    drop_probs = [0.5, 0.7, 0.8, 1]
     # Train the model
-    parameters = deeplearn.L_layer_model(train_x, train_y, layers_dims, num_iterations=2500, print_cost=True)
+    parameters = deeplearn.L_layer_model(train_x, train_y, layers_dims, num_iterations=2500, print_cost=True, lambd=0.7, keep_probs=drop_probs)
 
     # Predict result with trained parameters
+    print("On the train set:")
     pred_train = deeplearn.predict(train_x, train_y, parameters)
+    print("On the test set:")
     pred_test = deeplearn.predict(test_x, test_y, parameters)
 
 
