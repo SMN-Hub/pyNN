@@ -1,4 +1,4 @@
-from deeplearn.activation import *
+from deeplearn.activation_old import *
 
 
 def initialize_parameters_deep(layer_dims):
