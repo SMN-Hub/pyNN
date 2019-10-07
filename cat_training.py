@@ -4,6 +4,7 @@ import h5py
 import deeplearn
 
 np.random.seed(1)
+plt.rcParams['figure.figsize'] = (5.0, 4.0)  # set default size of plots
 
 
 def load_data():
@@ -26,8 +27,8 @@ def load_data():
 def main():
     train_x_orig, train_y, test_x_orig, test_y, classes = load_data()
     index = 10
-    plt.imshow(train_x_orig[index])
-    plt.show()
+    # plt.imshow(train_x_orig[index])
+    # plt.show()
     print("y = " + str(train_y[0, index]) + ". It's a " + classes[train_y[0, index]].decode("utf-8") + " picture.")
 
     # Explore your dataset
@@ -57,16 +58,18 @@ def main():
 
     n_x = train_x.shape[0]  # num_px * num_px * 3
 
-    layers_dims = [20, 7, 5, 1]  # 4-layer model
-    drop_probs = [0.5, 0.7, 0.8, 1]
+    layers_dims = (20, 7, 5, 1)  # 4-layer model
     # Train the model
-    parameters = deeplearn.L_layer_model(train_x, train_y, layers_dims, num_iterations=2500, print_cost=True, lambd=0.7, keep_probs=drop_probs)
+    classifier = deeplearn.NeuralNetLearn(layers_dims)
+    # classifier.add_regularization(deeplearn.L2Regularization(0.7))
+    classifier.add_regularization(deeplearn.DropOutRegularization((0.7, 0.8, 0.9, 1)))
+    classifier.fit(train_x, train_y)
 
     # Predict result with trained parameters
     print("On the train set:")
-    pred_train = deeplearn.predict(train_x, train_y, parameters)
+    pred_train = classifier.predict(train_x, train_y)
     print("On the test set:")
-    pred_test = deeplearn.predict(test_x, test_y, parameters)
+    pred_test = classifier.predict(test_x, test_y)
 
 
 if __name__ == "__main__":

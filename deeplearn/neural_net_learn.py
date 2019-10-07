@@ -1,30 +1,42 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from deeplearn.activation import ACTIVATIONS, BACKWARD_DERIVATIONS
 from deeplearn.regularization import Regularization
 
+plt.rcParams['image.interpolation'] = 'nearest'
+plt.rcParams['image.cmap'] = 'gray'
+
 
 class NeuralNetLearn:
+    """
+    Implements a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
+    """
     def __init__(self, layers_sizes):
+        """
+        Arguments:
+        layers_sizes -- list containing the input size and each layer size.
+        """
         self.layers_sizes = layers_sizes
         self.hidden_layer_activation = 'relu'
         self.output_layer_activation = 'sigmoid'
-        self.print_cost_rate = 0
+        self.print_cost_rate = 100
         self.regularizations = []
         self.cache = {}
         self.__reset()
 
     def __reset(self):
-        self.cache = {'W': [], 'b': [], 'A': [], 'Z': [], 'dW': [], 'db': []}
+        size = len(self.layers_sizes) + 1
+        self.cache = {'W': [None for x in range(size)], 'b': [None for x in range(size)], 'A': [None for x in range(size)], 'Z': [None for x in range(size)], 'dW': [None for x in range(size)], 'db': [None for x in range(size)]}
         for reg in self.regularizations:
-            reg.reset()
+            reg.reset(size-1)
 
     def get_cache(self, kind, layer):
-        return self.cache[kind][layer - 1]
+        return self.cache[kind][layer]
 
     def set_cache(self, kind, layer, value):
-        self.cache[kind].insert(layer - 1, value)
+        self.cache[kind][layer] = value
 
-    def add_regularization(self, regularization:Regularization):
+    def add_regularization(self, regularization: Regularization):
         regularization.validate(len(self.layers_sizes))
         self.regularizations.append(regularization)
 
@@ -104,8 +116,9 @@ class NeuralNetLearn:
         AL -- last post-activation value
         """
 
+        self.set_cache('A', 0, X)
         A = X
-        L = len(self.cache['W'])  # number of layers in the neural network
+        L = len(self.layers_sizes)  # number of layers in the neural network
 
         # Implement [LINEAR -> RELU]*(L-1).
         for layer in range(1, L):
@@ -160,18 +173,19 @@ class NeuralNetLearn:
         dZ = activation_backward(dA, Z)
 
         m = A_prev.shape[1]
-
         dW = 1. / m * np.dot(dZ, A_prev.T)
         db = 1. / m * np.sum(dZ, axis=1, keepdims=True)
-        dA_prev = np.dot(W.T, dZ)
-
         # Regularization
         dW = self.regularize_weights(m, dW, W)
-        dA_prev = self.regularize_derivative(layer, dA_prev)
-
-        assert (dA_prev.shape == A_prev.shape)
         assert (dW.shape == W.shape)
         assert (db.shape == b.shape)
+
+        dA_prev = None
+        if layer > 1:  # no use to compute dA for layer 1
+            dA_prev = np.dot(W.T, dZ)
+            # Regularization
+            dA_prev = self.regularize_derivative(layer - 1, dA_prev)
+            assert (dA_prev.shape == A_prev.shape)
 
         # cache
         self.set_cache('dW', layer, dW)
@@ -187,7 +201,7 @@ class NeuralNetLearn:
         AL -- probability vector, output of the forward propagation (L_model_forward())
         Y -- true "label" vector (containing 0 if non-cat, 1 if cat)
         """
-        L = len(self.cache['W'])  # the number of layers
+        L = len(self.layers_sizes)  # the number of layers
         Y = Y.reshape(AL.shape)  # after this line, Y is the same shape as AL
 
         # Initializing the backpropagation
@@ -200,12 +214,40 @@ class NeuralNetLearn:
             # lth layer: (RELU -> LINEAR) gradients.
             dA = self.linear_activation_backward(l, dA, BACKWARD_DERIVATIONS[self.hidden_layer_activation])
 
+    def update_parameters(self, learning_rate):
+        """
+        Update parameters using gradient descent
+
+        Arguments:
+        learning_rate -- alpha hyper parameter
+        """
+        W = self.cache['W']
+        b = self.cache['b']
+        dW = self.cache['dW']
+        db = self.cache['db']
+
+        L = len(self.layers_sizes)  # number of layers in the neural network
+
+        # Update rule for each parameter.
+        for l in range(1, L+1):
+            W[l] = W[l] - learning_rate * dW[l]
+            b[l] = b[l] - learning_rate * db[l]
+
     def fit(self, X, Y, learning_rate=0.0075, max_iter=2500):
+        """
+        Trains a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
+
+        Arguments:
+        X -- data, numpy array of shape (number of features, number of examples)
+        Y -- true "label" vector, of shape (1, number of examples)
+        learning_rate -- learning rate of the gradient descent update rule
+        max_iter -- number of iterations of the optimization loop
+        """
         self.__reset()
         costs = []  # keep track of cost
 
         n_x = X.shape[0]
-        layers_dims = tuple(n_x) + self.layers_sizes
+        layers_dims = (n_x,) + self.layers_sizes
 
         # Parameters initialization.
         self.initialize_parameters_deep(layers_dims)
@@ -226,7 +268,43 @@ class NeuralNetLearn:
 
             # Print the cost every 100 training example
             if self.print_cost_rate > 0 and i % self.print_cost_rate == 0:
-                print("Cost after iteration %i: %f" % (i, cost))
+                print(f"Cost after iteration {i}: {cost}")
                 costs.append(cost)
+        # plot the cost
+        if self.print_cost_rate > 0:
+            plt.plot(np.squeeze(costs))
+            plt.ylabel('cost')
+            plt.xlabel(f"iterations (per {self.print_cost_rate})")
+            plt.title("Learning rate =" + str(learning_rate))
+            plt.show()
 
+    def predict(self, X, y):
+        """
+        This function is used to predict the results of a  L-layer neural network.
 
+        Arguments:
+        X -- data set of examples you would like to label, , numpy array of shape (number of features, number of examples)
+        Y -- true "label" vector, of shape (1, number of examples)
+        parameters -- parameters of the trained model
+
+        Returns:
+        p -- predictions for the given dataset X
+        """
+
+        m = X.shape[1]
+        p = np.zeros((1, m))
+
+        # Forward propagation
+        probas = self.forward_propagation(X)
+
+        # convert probas to 0/1 predictions
+        for i in range(0, probas.shape[1]):
+            if probas[0, i] > 0.5:
+                p[0, i] = 1
+
+        # print results
+        # print ("predictions: " + str(p))
+        # print ("true labels: " + str(y))
+        print("Accuracy: " + str(np.sum((p == y) / m)))
+
+        return p

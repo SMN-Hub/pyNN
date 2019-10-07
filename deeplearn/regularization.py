@@ -28,7 +28,7 @@ class L2Regularization(Regularization):
     def regularize_cost(self, m_samples, W):
         L2_regularization_cost = 0
         if self.lambd > 0:
-            for l in range(len(W)):
+            for l in range(1, len(W)):
                 L2_regularization_cost += np.sum(np.square(W[l]))
             L2_regularization_cost *= self.lambd / (2 * m_samples)
         return L2_regularization_cost
@@ -42,7 +42,7 @@ class L2Regularization(Regularization):
 
 class DropOutRegularization(Regularization):
     def __init__(self, layers_probs):
-        assert (len(self.layers_probs) > 0)
+        assert (len(layers_probs) > 0)
         self.layers_probs = layers_probs
         self.D = []
 
