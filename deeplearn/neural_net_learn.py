@@ -26,7 +26,7 @@ class NeuralNetLearn:
 
     def __reset(self):
         size = len(self.layers_sizes) + 1
-        self.cache = {'W': [None for x in range(size)], 'b': [None for x in range(size)], 'A': [None for x in range(size)], 'Z': [None for x in range(size)], 'dW': [None for x in range(size)], 'db': [None for x in range(size)]}
+        self.cache = {'W': [None]*size, 'b': [None]*size, 'A': [None]*size, 'Z': [None]*size, 'dW': [None]*size, 'db': [None]*size}
         for reg in self.regularizations:
             reg.reset(size-1)
 

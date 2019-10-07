@@ -2,10 +2,10 @@ import numpy as np
 
 
 class Regularization:
-    def validate(self, layer_sizes):
+    def validate(self, layers_count):
         pass
 
-    def reset(self, layer_sizes):
+    def reset(self, layers_count):
         pass
 
     def regularize_activation(self, layer, A):
@@ -46,11 +46,11 @@ class DropOutRegularization(Regularization):
         self.layers_probs = layers_probs
         self.D = []
 
-    def validate(self, layer_count):
-        assert (len(self.layers_probs) <= layer_count)
+    def validate(self, layers_count):
+        assert (len(self.layers_probs) <= layers_count)
 
-    def reset(self, layer_sizes):
-        self.D = []
+    def reset(self, layers_count):
+        self.D = [None]*layers_count
 
     def regularize_activation(self, layer, A):
         D = None
@@ -59,7 +59,7 @@ class DropOutRegularization(Regularization):
             if keep_prob is not None and keep_prob < 1:
                 D = np.random.rand(A.shape[0], A.shape[1]) < keep_prob
                 A = np.multiply(A, D) / keep_prob
-        self.D.insert(layer - 1, D)
+        self.D[layer - 1] = D
         return A
 
     def regularize_derivative(self, layer, dA):
