@@ -60,9 +60,9 @@ def main():
 
     layers_dims = (20, 7, 5, 1)  # 4-layer model
     # Train the model
-    classifier = deeplearn.NeuralNetLearn(layers_dims)
+    classifier = deeplearn.NeuralNetLearn(layers_dims, batch_threshold=100, batch_size=64)
     classifier.add_regularization(deeplearn.L2Regularization(0.7))
-    classifier.add_regularization(deeplearn.DropOutRegularization((0.7, 0.8, 0.9, 1)))
+#    classifier.add_regularization(deeplearn.DropOutRegularization((0.7, 0.8, 0.9, 1)))
     classifier.fit(train_x, train_y)
 
     # Predict result with trained parameters

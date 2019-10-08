@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from deeplearn.activation import ACTIVATIONS, BACKWARD_DERIVATIONS
 from deeplearn.regularization import Regularization
+from deeplearn.dataset_utils import slice_data
 
 plt.rcParams['image.interpolation'] = 'nearest'
 plt.rcParams['image.cmap'] = 'gray'
@@ -11,57 +12,64 @@ class NeuralNetLearn:
     """
     Implements a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
     """
-    def __init__(self, layers_sizes):
+    def __init__(self, layers_sizes, batch_threshold=2_000, batch_size=512):
         """
         Arguments:
         layers_sizes -- list containing the input size and each layer size.
+        batch_threshold -- Data size threshold to trigger mini batch split.
+        batch_size -- Mini batch size, triggered if data size exceeds batch_threshold.
         """
         self.layers_sizes = layers_sizes
+        self.batch_threshold = batch_threshold
+        self.batch_size = batch_size
         self.hidden_layer_activation = 'relu'
         self.output_layer_activation = 'sigmoid'
         self.print_cost_rate = 100
-        self.regularizations = []
-        self.cache = {}
-        self.__reset()
+        self.__regularizations = []
+        self.__cache = {}
+        self.__reset(True)
 
-    def __reset(self):
+    def __reset(self, full: bool):
         size = len(self.layers_sizes) + 1
-        self.cache = {'W': [None]*size, 'b': [None]*size, 'A': [None]*size, 'Z': [None]*size, 'dW': [None]*size, 'db': [None]*size}
-        for reg in self.regularizations:
-            reg.reset(size-1)
+        if full:  # complete reset
+            self.__cache = {'W': [None] * size, 'b': [None] * size, 'A': [None] * size, 'Z': [None] * size, 'dW': [None] * size, 'db': [None] * size}
+            for reg in self.__regularizations:
+                reg.reset(size-1)
+        else:  # inter-batch reset: keep W & b
+            self.__cache.update({'A': [None] * size, 'Z': [None] * size, 'dW': [None] * size, 'db': [None] * size})
 
     def get_cache(self, kind, layer):
-        return self.cache[kind][layer]
+        return self.__cache[kind][layer]
 
     def set_cache(self, kind, layer, value):
-        self.cache[kind][layer] = value
+        self.__cache[kind][layer] = value
 
     def add_regularization(self, regularization: Regularization):
         regularization.validate(len(self.layers_sizes))
-        self.regularizations.append(regularization)
+        self.__regularizations.append(regularization)
 
-    def regularize_activation(self, layer, A):
-        for reg in self.regularizations:
+    def _regularize_activation(self, layer, A):
+        for reg in self.__regularizations:
             A = reg.regularize_activation(layer, A)
         return A
 
-    def regularize_cost(self, m_samples, W):
+    def _regularize_cost(self, m_samples, W):
         regularization_cost = 0
-        for reg in self.regularizations:
+        for reg in self.__regularizations:
             regularization_cost += reg.regularize_cost(m_samples, W)
         return regularization_cost
 
-    def regularize_weights(self, m_samples, dW, W):
-        for reg in self.regularizations:
+    def _regularize_weights(self, m_samples, dW, W):
+        for reg in self.__regularizations:
             dW = reg.regularize_weights(m_samples, dW, W)
         return dW
 
-    def regularize_derivative(self, layer, dA):
-        for reg in self.regularizations:
+    def _regularize_derivative(self, layer, dA):
+        for reg in self.__regularizations:
             dA = reg.regularize_derivative(layer, dA)
         return dA
 
-    def initialize_parameters_deep(self, layer_dims):
+    def _initialize_parameters_deep(self, layer_dims):
         """
         Arguments:
         layer_dims -- python array (tuple) containing the dimensions of each layer in our network
@@ -73,7 +81,7 @@ class NeuralNetLearn:
             self.set_cache('W', l, np.random.randn(layer_dims[l], layer_dims[l - 1]) / np.sqrt(layer_dims[l - 1]))
             self.set_cache('b', l, np.zeros((layer_dims[l], 1)))
 
-    def linear_activation_forward(self, layer, A_prev, activation):
+    def _linear_activation_forward(self, layer, A_prev, activation, with_regularization):
         """
         Implement the forward propagation for the LINEAR->ACTIVATION layer
 
@@ -83,6 +91,7 @@ class NeuralNetLearn:
         W -- weights matrix: numpy array of shape (size of current layer, size of previous layer)
         b -- bias vector, numpy array of shape (size of the current layer, 1)
         activation -- the activation function to be used in this layer
+        with_regularization -- apply regularization (for training only)
 
         Returns:
         A -- the output of the activation function, also called the post-activation value
@@ -96,7 +105,8 @@ class NeuralNetLearn:
         Z = W.dot(A_prev) + b
         A = activation(Z)
 
-        A = self.regularize_activation(layer, A)
+        if with_regularization:
+            A = self._regularize_activation(layer, A)
 
         assert (A.shape == (W.shape[0], A_prev.shape[1]))
 
@@ -105,12 +115,13 @@ class NeuralNetLearn:
 
         return A
 
-    def forward_propagation(self, X):
+    def _forward_propagation(self, X, with_regularization):
         """
         Implement forward propagation for the [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID computation
 
         Arguments:
         X -- data, numpy array of shape (input size, number of examples)
+        with_regularization -- apply regularization (for training only)
 
         Returns:
         AL -- last post-activation value
@@ -123,16 +134,16 @@ class NeuralNetLearn:
         # Implement [LINEAR -> RELU]*(L-1).
         for layer in range(1, L):
             A_prev = A
-            A = self.linear_activation_forward(layer, A_prev, ACTIVATIONS[self.hidden_layer_activation])
+            A = self._linear_activation_forward(layer, A_prev, ACTIVATIONS[self.hidden_layer_activation], with_regularization)
 
         # Implement LINEAR -> SIGMOID.
-        AL = self.linear_activation_forward(L, A, ACTIVATIONS[self.output_layer_activation])
+        AL = self._linear_activation_forward(L, A, ACTIVATIONS[self.output_layer_activation], with_regularization)
 
         assert (AL.shape == (1, X.shape[1]))
 
         return AL
 
-    def compute_cost(self, AL, Y):
+    def _compute_cost(self, AL, Y):
         """
         Implement the cost function defined by equation (7).
 
@@ -151,9 +162,9 @@ class NeuralNetLearn:
         cross_entropy_cost = np.squeeze(cross_entropy_cost)  # To make sure your cost's shape is what we expect (e.g. this turns [[17]] into 17).
         assert (cross_entropy_cost.shape == ())
 
-        return cross_entropy_cost + self.regularize_cost(m, self.cache['W'])
+        return cross_entropy_cost + self._regularize_cost(m, self.__cache['W'])
 
-    def linear_activation_backward(self, layer, dA, activation_backward):
+    def _linear_activation_backward(self, layer, dA, activation_backward):
         """
         Implement the backward propagation for the LINEAR->ACTIVATION layer.
 
@@ -176,7 +187,7 @@ class NeuralNetLearn:
         dW = 1. / m * np.dot(dZ, A_prev.T)
         db = 1. / m * np.sum(dZ, axis=1, keepdims=True)
         # Regularization
-        dW = self.regularize_weights(m, dW, W)
+        dW = self._regularize_weights(m, dW, W)
         assert (dW.shape == W.shape)
         assert (db.shape == b.shape)
 
@@ -184,7 +195,7 @@ class NeuralNetLearn:
         if layer > 1:  # no use to compute dA for layer 1
             dA_prev = np.dot(W.T, dZ)
             # Regularization
-            dA_prev = self.regularize_derivative(layer - 1, dA_prev)
+            dA_prev = self._regularize_derivative(layer - 1, dA_prev)
             assert (dA_prev.shape == A_prev.shape)
 
         # cache
@@ -193,7 +204,7 @@ class NeuralNetLearn:
 
         return dA_prev
 
-    def backward_propagation(self, AL, Y):
+    def _backward_propagation(self, AL, Y):
         """
         Implement the backward propagation for the [LINEAR->RELU] * (L-1) -> LINEAR -> SIGMOID group
 
@@ -208,23 +219,23 @@ class NeuralNetLearn:
         dAL = - (np.divide(Y, AL) - np.divide(1 - Y, 1 - AL))
 
         # Lth layer (SIGMOID -> LINEAR) gradients.
-        dA = self.linear_activation_backward(L, dAL, BACKWARD_DERIVATIONS[self.output_layer_activation])
+        dA = self._linear_activation_backward(L, dAL, BACKWARD_DERIVATIONS[self.output_layer_activation])
 
         for l in reversed(range(1, L)):
             # lth layer: (RELU -> LINEAR) gradients.
-            dA = self.linear_activation_backward(l, dA, BACKWARD_DERIVATIONS[self.hidden_layer_activation])
+            dA = self._linear_activation_backward(l, dA, BACKWARD_DERIVATIONS[self.hidden_layer_activation])
 
-    def update_parameters(self, learning_rate):
+    def _update_parameters(self, learning_rate):
         """
         Update parameters using gradient descent
 
         Arguments:
         learning_rate -- alpha hyper parameter
         """
-        W = self.cache['W']
-        b = self.cache['b']
-        dW = self.cache['dW']
-        db = self.cache['db']
+        W = self.__cache['W']
+        b = self.__cache['b']
+        dW = self.__cache['dW']
+        db = self.__cache['db']
 
         L = len(self.layers_sizes)  # number of layers in the neural network
 
@@ -232,6 +243,31 @@ class NeuralNetLearn:
         for l in range(1, L+1):
             W[l] = W[l] - learning_rate * dW[l]
             b[l] = b[l] - learning_rate * db[l]
+
+    def _fit_batch(self, X, Y, learning_rate):
+        """
+        Trains a L-layer neural network batch
+
+        Arguments:
+        X -- data, numpy array of shape (number of features, number of examples)
+        Y -- true "label" vector, of shape (1, number of examples)
+        learning_rate -- learning rate of the gradient descent update rule
+        """
+        self.__reset(False)
+
+        # Forward propagation: [LINEAR -> RELU]*(L-1) -> LINEAR -> SIGMOID.
+        AL = self._forward_propagation(X, True)
+
+        # Compute cost.
+        cost = self._compute_cost(AL, Y)
+
+        # Backward propagation.
+        self._backward_propagation(AL, Y)
+
+        # Update parameters.
+        self._update_parameters(learning_rate)
+
+        return cost
 
     def fit(self, X, Y, learning_rate=0.0075, max_iter=2500):
         """
@@ -243,29 +279,24 @@ class NeuralNetLearn:
         learning_rate -- learning rate of the gradient descent update rule
         max_iter -- number of iterations of the optimization loop
         """
-        self.__reset()
+        self.__reset(True)
         costs = []  # keep track of cost
 
         n_x = X.shape[0]
-        layers_dims = (n_x,) + self.layers_sizes
+        m_samples = X.shape[1]
 
         # Parameters initialization.
-        self.initialize_parameters_deep(layers_dims)
+        layers_dims = (n_x,) + self.layers_sizes
+        self._initialize_parameters_deep(layers_dims)
 
         # Loop (gradient descent)
         for i in range(0, max_iter):
-            # Forward propagation: [LINEAR -> RELU]*(L-1) -> LINEAR -> SIGMOID.
-            AL = self.forward_propagation(X)
-
-            # Compute cost.
-            cost = self.compute_cost(AL, Y)
-
-            # Backward propagation.
-            self.backward_propagation(AL, Y)
-
-            # Update parameters.
-            self.update_parameters(learning_rate)
-
+            cumulative_loss = 0
+            # Loop (mini batch)
+            for batch_slice in slice_data(m_samples, self.batch_size, self.batch_threshold):
+                batch_cost = self._fit_batch(X[:, batch_slice], Y[:, batch_slice], learning_rate)
+                cumulative_loss += batch_cost * (batch_slice.stop - batch_slice.start)
+            cost = cumulative_loss / m_samples
             # Print the cost every 100 training example
             if self.print_cost_rate > 0 and i % self.print_cost_rate == 0:
                 print(f"Cost after iteration {i}: {cost}")
@@ -295,7 +326,7 @@ class NeuralNetLearn:
         p = np.zeros((1, m))
 
         # Forward propagation
-        probas = self.forward_propagation(X)
+        probas = self._forward_propagation(X, False)
 
         # convert probas to 0/1 predictions
         for i in range(0, probas.shape[1]):

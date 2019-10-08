@@ -53,13 +53,12 @@ class DropOutRegularization(Regularization):
         self.D = [None]*layers_count
 
     def regularize_activation(self, layer, A):
-        D = None
         if layer <= len(self.layers_probs):
             keep_prob = self.layers_probs[layer - 1]
             if keep_prob is not None and keep_prob < 1:
                 D = np.random.rand(A.shape[0], A.shape[1]) < keep_prob
                 A = np.multiply(A, D) / keep_prob
-        self.D[layer - 1] = D
+                self.D[layer - 1] = D
         return A
 
     def regularize_derivative(self, layer, dA):
