@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from deeplearn.activation import ACTIVATIONS, BACKWARD_DERIVATIONS
 from deeplearn.regularization import Regularization
 from deeplearn.dataset_utils import slice_data
+from deeplearn.learning_rate_decay import LearningRate
 
 plt.rcParams['image.interpolation'] = 'nearest'
 plt.rcParams['image.cmap'] = 'gray'
@@ -273,7 +274,7 @@ class NeuralNetLearn:
 
         return cost
 
-    def fit(self, X, Y, learning_rate=0.0075, max_iter=2500):
+    def fit(self, X, Y, learning_rate_f: LearningRate, max_iter=2500):
         """
         Trains a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
 
@@ -288,6 +289,9 @@ class NeuralNetLearn:
 
         n_x = X.shape[0]
         m_samples = X.shape[1]
+        learning_rate_zero = learning_rate_f.next(0, 0)
+        learning_rate = learning_rate_zero
+        epoch = 0
 
         # Parameters initialization.
         layers_dims = (n_x,) + self.layers_sizes
@@ -295,6 +299,8 @@ class NeuralNetLearn:
 
         # Loop (gradient descent)
         for i in range(0, max_iter):
+            # update learning rate
+            learning_rate = learning_rate_f.next(i, epoch)
             cumulative_loss = 0
             # Loop (mini batch)
             for batch_slice in slice_data(m_samples, self.batch_size, self.batch_threshold):
@@ -303,14 +309,15 @@ class NeuralNetLearn:
             cost = cumulative_loss / m_samples
             # Print the cost every 100 training example
             if self.print_cost_rate > 0 and i % self.print_cost_rate == 0:
-                print(f"Cost after iteration {i}: {cost}")
+                epoch += 1
+                print(f"Cost after iteration {i}: {cost} - learning rate: {learning_rate}")
                 costs.append(cost)
         # plot the cost
         if self.print_cost_rate > 0:
             plt.plot(np.squeeze(costs))
             plt.ylabel('cost')
             plt.xlabel(f"iterations (per {self.print_cost_rate})")
-            plt.title("Learning rate =" + str(learning_rate))
+            plt.title(f"Learning rate = [{learning_rate_zero} : {learning_rate}]")
             plt.show()
 
     def predict(self, X, y):

@@ -61,10 +61,14 @@ def main():
     layers_dims = (20, 7, 5, 1)  # 4-layer model
     # Train the model
     classifier = deeplearn.NeuralNetLearn(layers_dims)  #, batch_threshold=100, batch_size=64)
-#    classifier.add_regularization(deeplearn.L2Regularization(0.7))
-#    classifier.add_regularization(deeplearn.DropOutRegularization((0.7, 0.8, 0.9, 1)))
+    # classifier.add_regularization(deeplearn.L2Regularization(0.7))
+    # classifier.add_regularization(deeplearn.DropOutRegularization((0.7, 0.8, 0.9, 1)))
     classifier.add_regularization(deeplearn.MomentumRegularization(0.9))
-    classifier.fit(train_x, train_y, learning_rate=0.1)
+    # learning_rate = deeplearn.LearningRateLinear(0.1, 0)
+    # learning_rate = deeplearn.LearningRateExponential(0.1, 0.96)
+    # learning_rate = deeplearn.LearningRateRoot(0.1, 1)
+    learning_rate = deeplearn.LearningRateDiscrete(0.1, (2000, 2300, 2350, 2400, 2450, 2475))
+    classifier.fit(train_x, train_y, learning_rate, max_iter=2500)
 
     # Predict result with trained parameters
     print("On the train set:")
