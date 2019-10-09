@@ -14,8 +14,8 @@ class Regularization:
     def regularize_cost(self, m_samples, W):
         return 0
 
-    def regularize_weights(self, m_samples, dW, W):
-        return dW
+    def regularize_weights(self, m_samples, dW, W, db, b):
+        return dW, db
 
     def regularize_derivative(self, layer, dA):
         return dA
@@ -33,11 +33,11 @@ class L2Regularization(Regularization):
             L2_regularization_cost *= self.lambd / (2 * m_samples)
         return L2_regularization_cost
 
-    def regularize_weights(self, m_samples, dW, W):
+    def regularize_weights(self, m_samples, dW, W, db, b):
         if self.lambd > 0:
-            return dW + W * self.lambd / m_samples
+            return dW + W * self.lambd / m_samples, db
         else:
-            return dW
+            return dW, db
 
 
 class DropOutRegularization(Regularization):
@@ -67,3 +67,18 @@ class DropOutRegularization(Regularization):
             return np.multiply(dA, D)
         else:
             return dA
+
+
+class MomentumRegularization(Regularization):
+    def __init__(self, beta=0.9):
+        self.beta = beta
+        self.velocity = (0., 0.)
+
+    def reset(self, layers_count):
+        self.velocity = (0., 0.)
+
+    def regularize_weights(self, m_samples, dW, W, db, b):
+        dW_velocity = self.beta * self.velocity[0] + (1-self.beta) * dW
+        db_velocity = self.beta * self.velocity[1] + (1-self.beta) * db
+        self.velocity = (dW_velocity, db_velocity)
+        return dW_velocity, db_velocity

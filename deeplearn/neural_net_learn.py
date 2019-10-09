@@ -33,10 +33,10 @@ class NeuralNetLearn:
         size = len(self.layers_sizes) + 1
         if full:  # complete reset
             self.__cache = {'W': [None] * size, 'b': [None] * size, 'A': [None] * size, 'Z': [None] * size, 'dW': [None] * size, 'db': [None] * size}
-            for reg in self.__regularizations:
-                reg.reset(size-1)
         else:  # inter-batch reset: keep W & b
             self.__cache.update({'A': [None] * size, 'Z': [None] * size, 'dW': [None] * size, 'db': [None] * size})
+        for reg in self.__regularizations:
+            reg.reset(size-1)
 
     def get_cache(self, kind, layer):
         return self.__cache[kind][layer]
@@ -59,10 +59,10 @@ class NeuralNetLearn:
             regularization_cost += reg.regularize_cost(m_samples, W)
         return regularization_cost
 
-    def _regularize_weights(self, m_samples, dW, W):
+    def _regularize_weights(self, m_samples, dW, W, db, b):
         for reg in self.__regularizations:
-            dW = reg.regularize_weights(m_samples, dW, W)
-        return dW
+            dW, db = reg.regularize_weights(m_samples, dW, W, db, b)
+        return dW, db
 
     def _regularize_derivative(self, layer, dA):
         for reg in self.__regularizations:
@@ -72,14 +72,14 @@ class NeuralNetLearn:
     def _initialize_parameters_deep(self, layer_dims):
         """
         Arguments:
-        layer_dims -- python array (tuple) containing the dimensions of each layer in our network
+        layer_dims -- python array (tuple) containing the dimensions of each layer in our network, including input (layer 0)
         """
         np.random.seed(1)
         L = len(layer_dims)  # number of layers in the network
 
-        for l in range(1, L):
-            self.set_cache('W', l, np.random.randn(layer_dims[l], layer_dims[l - 1]) / np.sqrt(layer_dims[l - 1]))
-            self.set_cache('b', l, np.zeros((layer_dims[l], 1)))
+        for layer in range(1, L):
+            self.set_cache('W', layer, np.random.randn(layer_dims[layer], layer_dims[layer - 1]) / np.sqrt(layer_dims[layer - 1]))
+            self.set_cache('b', layer, np.zeros((layer_dims[layer], 1)))
 
     def _linear_activation_forward(self, layer, A_prev, activation, with_regularization):
         """
@@ -187,7 +187,7 @@ class NeuralNetLearn:
         dW = 1. / m * np.dot(dZ, A_prev.T)
         db = 1. / m * np.sum(dZ, axis=1, keepdims=True)
         # Regularization
-        dW = self._regularize_weights(m, dW, W)
+        dW, db = self._regularize_weights(m, dW, W, db, b)
         assert (dW.shape == W.shape)
         assert (db.shape == b.shape)
 
@@ -221,9 +221,9 @@ class NeuralNetLearn:
         # Lth layer (SIGMOID -> LINEAR) gradients.
         dA = self._linear_activation_backward(L, dAL, BACKWARD_DERIVATIONS[self.output_layer_activation])
 
-        for l in reversed(range(1, L)):
+        for layer in reversed(range(1, L)):
             # lth layer: (RELU -> LINEAR) gradients.
-            dA = self._linear_activation_backward(l, dA, BACKWARD_DERIVATIONS[self.hidden_layer_activation])
+            dA = self._linear_activation_backward(layer, dA, BACKWARD_DERIVATIONS[self.hidden_layer_activation])
 
     def _update_parameters(self, learning_rate):
         """
@@ -240,9 +240,9 @@ class NeuralNetLearn:
         L = len(self.layers_sizes)  # number of layers in the neural network
 
         # Update rule for each parameter.
-        for l in range(1, L+1):
-            W[l] = W[l] - learning_rate * dW[l]
-            b[l] = b[l] - learning_rate * db[l]
+        for layer in range(1, L+1):
+            W[layer] = W[layer] - learning_rate * dW[layer]
+            b[layer] = b[layer] - learning_rate * db[layer]
 
     def _fit_batch(self, X, Y, learning_rate):
         """
