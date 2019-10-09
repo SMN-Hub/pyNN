@@ -38,6 +38,10 @@ class NeuralNetLearn:
         for reg in self.__regularizations:
             reg.reset(size-1)
 
+    @property
+    def parameters(self):
+        return self.__cache['W'], self.__cache['b']
+
     def get_cache(self, kind, layer):
         return self.__cache[kind][layer]
 
@@ -59,9 +63,9 @@ class NeuralNetLearn:
             regularization_cost += reg.regularize_cost(m_samples, W)
         return regularization_cost
 
-    def _regularize_weights(self, m_samples, dW, W, db, b):
+    def _regularize_weights(self, layer, m_samples, dW, W, db, b):
         for reg in self.__regularizations:
-            dW, db = reg.regularize_weights(m_samples, dW, W, db, b)
+            dW, db = reg.regularize_weights(layer, m_samples, dW, W, db, b)
         return dW, db
 
     def _regularize_derivative(self, layer, dA):
@@ -187,7 +191,7 @@ class NeuralNetLearn:
         dW = 1. / m * np.dot(dZ, A_prev.T)
         db = 1. / m * np.sum(dZ, axis=1, keepdims=True)
         # Regularization
-        dW, db = self._regularize_weights(m, dW, W, db, b)
+        dW, db = self._regularize_weights(layer, m, dW, W, db, b)
         assert (dW.shape == W.shape)
         assert (db.shape == b.shape)
 
@@ -240,9 +244,9 @@ class NeuralNetLearn:
         L = len(self.layers_sizes)  # number of layers in the neural network
 
         # Update rule for each parameter.
-        for layer in range(1, L+1):
-            W[layer] = W[layer] - learning_rate * dW[layer]
-            b[layer] = b[layer] - learning_rate * db[layer]
+        upd = slice(1, L+1)
+        W[upd] = W[upd] - np.multiply(learning_rate, dW[upd])
+        b[upd] = b[upd] - np.multiply(learning_rate, db[upd])
 
     def _fit_batch(self, X, Y, learning_rate):
         """

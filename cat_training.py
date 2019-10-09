@@ -64,7 +64,7 @@ def main():
 #    classifier.add_regularization(deeplearn.L2Regularization(0.7))
 #    classifier.add_regularization(deeplearn.DropOutRegularization((0.7, 0.8, 0.9, 1)))
     classifier.add_regularization(deeplearn.MomentumRegularization(0.9))
-    classifier.fit(train_x, train_y)
+    classifier.fit(train_x, train_y, learning_rate=0.1)
 
     # Predict result with trained parameters
     print("On the train set:")
