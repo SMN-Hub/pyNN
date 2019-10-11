@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from deeplearn.activation import ACTIVATIONS, BACKWARD_DERIVATIONS
 from deeplearn.regularization import Regularization
-from deeplearn.dataset_utils import slice_data
+from deeplearn.dataset_utils import slice_data, shuffle_data
 from deeplearn.learning_rate_decay import LearningRate
 
 plt.rcParams['image.interpolation'] = 'nearest'
@@ -13,22 +13,37 @@ class NeuralNetLearn:
     """
     Implements a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
     """
-    def __init__(self, layers_sizes, batch_threshold=2_000, batch_size=512):
+    def __init__(self, layers_sizes, init_shuffle_seed=1, data_shuffle_seed=None):
         """
         Arguments:
         layers_sizes -- list containing the input size and each layer size.
-        batch_threshold -- Data size threshold to trigger mini batch split.
-        batch_size -- Mini batch size, triggered if data size exceeds batch_threshold.
+        init_shuffle_seed -- Random seed for shuffling data (mandatory).
+        data_shuffle_seed -- Random seed for shuffling data (optional, None for no shuffle).
         """
         self.layers_sizes = layers_sizes
-        self.batch_threshold = batch_threshold
-        self.batch_size = batch_size
+        self.init_shuffle_seed = init_shuffle_seed
+        self.data_shuffle_seed = data_shuffle_seed
+        self.batch_threshold = None
+        self.batch_size = None
         self.hidden_layer_activation = 'relu'
         self.output_layer_activation = 'sigmoid'
+        self.hidden_layer_init_factor = 1
+        self.output_layer_init_factor = 1
         self.print_cost_rate = 100
         self.__regularizations = []
         self.__cache = {}
         self.__reset(True)
+
+    def use_mini_batch(self, batch_size=512, batch_threshold=2_000):
+        """
+        Activate mini batch slicing
+
+        Arguments:
+        batch_size -- Mini batch size, triggered if data size exceeds batch_threshold.
+        batch_threshold -- Data size threshold to trigger mini batch slice (for small data sets < 2000, mini batch is generally not necessary).
+        """
+        self.batch_threshold = batch_threshold
+        self.batch_size = batch_size
 
     def __reset(self, full: bool):
         size = len(self.layers_sizes) + 1
@@ -79,12 +94,17 @@ class NeuralNetLearn:
         Arguments:
         layer_dims -- python array (tuple) containing the dimensions of each layer in our network, including input (layer 0)
         """
-        np.random.seed(1)
+        np.random.seed(self.init_shuffle_seed)
         L = len(layer_dims)  # number of layers in the network
+        # Hidden layers
+        for layer in range(1, L-1):
+            self._initialize_layer_parameters(layer_dims, layer, self.hidden_layer_init_factor)
+        # Output layer
+        self._initialize_layer_parameters(layer_dims, L-1, self.output_layer_init_factor)
 
-        for layer in range(1, L):
-            self.set_cache('W', layer, np.random.randn(layer_dims[layer], layer_dims[layer - 1]) / np.sqrt(layer_dims[layer - 1]))
-            self.set_cache('b', layer, np.zeros((layer_dims[layer], 1)))
+    def _initialize_layer_parameters(self, layer_dims, layer, factor):
+        self.set_cache('W', layer, np.random.randn(layer_dims[layer], layer_dims[layer - 1]) * np.sqrt(factor / layer_dims[layer - 1]))
+        self.set_cache('b', layer, np.zeros((layer_dims[layer], 1)))
 
     def _linear_activation_forward(self, layer, A_prev, activation, with_regularization):
         """
@@ -163,7 +183,7 @@ class NeuralNetLearn:
         m = Y.shape[1]
 
         # Compute loss from aL and y.
-        cross_entropy_cost = (1. / m) * (-np.dot(Y, np.log(AL).T) - np.dot(1 - Y, np.log(1 - AL).T))
+        cross_entropy_cost = -np.dot(Y, np.log(AL).T) - np.dot(1 - Y, np.log(1 - AL).T)
         cross_entropy_cost = np.squeeze(cross_entropy_cost)  # To make sure your cost's shape is what we expect (e.g. this turns [[17]] into 17).
         assert (cross_entropy_cost.shape == ())
 
@@ -274,7 +294,7 @@ class NeuralNetLearn:
 
         return cost
 
-    def fit(self, X, Y, learning_rate_f: LearningRate, max_iter=2500):
+    def fit(self, X, Y, learning_rate_f: LearningRate, max_iter=2500, plot_costs=True):
         """
         Trains a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
 
@@ -292,6 +312,8 @@ class NeuralNetLearn:
         learning_rate_zero = learning_rate_f.next(0, 0)
         learning_rate = learning_rate_zero
         epoch = 0
+        seed = self.data_shuffle_seed
+        train_X, train_Y = X, Y
 
         # Parameters initialization.
         layers_dims = (n_x,) + self.layers_sizes
@@ -299,13 +321,18 @@ class NeuralNetLearn:
 
         # Loop (gradient descent)
         for i in range(0, max_iter):
+            # Shuffle data if configured
+            if seed is not None:
+                seed += 1
+                train_X, train_Y = shuffle_data(X, Y, seed)
             # update learning rate
             learning_rate = learning_rate_f.next(i, epoch)
             cumulative_loss = 0
             # Loop (mini batch)
             for batch_slice in slice_data(m_samples, self.batch_size, self.batch_threshold):
-                batch_cost = self._fit_batch(X[:, batch_slice], Y[:, batch_slice], learning_rate)
-                cumulative_loss += batch_cost * (batch_slice.stop - batch_slice.start)
+                # Train BATCH
+                batch_cost = self._fit_batch(train_X[:, batch_slice], train_Y[:, batch_slice], learning_rate)
+                cumulative_loss += batch_cost
             cost = cumulative_loss / m_samples
             # Print the cost every 100 training example
             if self.print_cost_rate > 0 and i % self.print_cost_rate == 0:
@@ -313,14 +340,17 @@ class NeuralNetLearn:
                 print(f"Cost after iteration {i}: {cost} - learning rate: {learning_rate}")
                 costs.append(cost)
         # plot the cost
-        if self.print_cost_rate > 0:
+        if plot_costs and self.print_cost_rate > 0:
             plt.plot(np.squeeze(costs))
             plt.ylabel('cost')
             plt.xlabel(f"iterations (per {self.print_cost_rate})")
-            plt.title(f"Learning rate = [{learning_rate_zero} : {learning_rate}]")
+            if learning_rate_zero != learning_rate:
+                plt.title(f"Learning rate = [{learning_rate_zero} : {learning_rate}]")
+            else:
+                plt.title(f"Learning rate = {learning_rate}")
             plt.show()
 
-    def predict(self, X, y):
+    def predict(self, X, y=None):
         """
         This function is used to predict the results of a  L-layer neural network.
 
@@ -347,6 +377,7 @@ class NeuralNetLearn:
         # print results
         # print ("predictions: " + str(p))
         # print ("true labels: " + str(y))
-        print("Accuracy: " + str(np.sum((p == y) / m)))
+        if y is not None:
+            print("Accuracy: " + str(np.mean((p[0,:] == y[0,:]))))
 
         return p
