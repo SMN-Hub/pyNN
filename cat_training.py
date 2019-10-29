@@ -76,7 +76,7 @@ def main():
     print("On the train set:")
     pred_train = classifier.predict(train_x, train_y)
     print("On the test set:")
-    pred_test = classifier.predict(test_x, test_y)
+    pred_test = classifier.predict(test_x, test_y)  # 0.84
 
 
 if __name__ == "__main__":

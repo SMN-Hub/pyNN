@@ -13,13 +13,14 @@ def main():
     # Standardize data to have feature values between 0 and 1.
     train_x = train_x_flatten / 255.
     test_x = test_x_flatten / 255.
+    train_y = train_y.T.reshape((train_y.shape[1],))
 
-    mlp = MLPClassifier(hidden_layer_sizes=(20, 7, 5), verbose=0, random_state=0, max_iter=2500, solver='adam', learning_rate_init=0.0075)
-    mlp.fit(train_x, train_y.T)
-    print("Training set score: %f" % mlp.score(train_x, train_y.T))
+    mlp = MLPClassifier(hidden_layer_sizes=(20, 7, 5), verbose=0, random_state=1, max_iter=2500, solver='sgd', learning_rate_init=0.001)
+    mlp.fit(train_x, train_y)
+    print("Training set score: %f" % mlp.score(train_x, train_y))  # 0.995
     print("Training set loss: %f" % mlp.loss_)
 
-    print("Test set score: %f" % mlp.score(test_x, test_y.T))
+    print("Test set score: %f" % mlp.score(test_x, test_y.T))  # 0.66
 
 
 if __name__ == "__main__":
