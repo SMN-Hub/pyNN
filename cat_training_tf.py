@@ -1,7 +1,5 @@
 import tensorflow as tf
-from tensorflow import keras
 from tensorflow.keras.layers import Dense, Conv2D, Flatten, Dropout, MaxPooling2D
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 from cat_training import load_data
 
@@ -33,7 +31,10 @@ def main():
     # train
     model.fit(train_x, train_y.T, epochs=10)  # 0.856
     # evaluate on test set
-    model.evaluate(test_x, test_y.T)  # 0.8
+    print("Evaluating test set")
+    outs = model.evaluate(test_x, test_y.T)  # 0.8
+    print("loss:", outs[0])
+    print("acc:", outs[1])
     # C_20 + DO + C7  +DO + H5 + H1 => E20 0.8
     # C_64 + DO + C12 +DO + H20 + H20 + H1 => E20 0.7 / E10 0.9
 

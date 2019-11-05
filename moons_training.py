@@ -53,7 +53,7 @@ def main():
     # classifier.output_layer_init_factor = 2
     # classifier.hidden_layer_init_factor = 2
     classifier.add_regularization(deeplearn.AdamOptimization(0.9))
-    learning_rate = deeplearn.LearningRateLinear(0.0007, 0)
+    learning_rate = deeplearn.LearningRateDecayLinear(0.0007, 0)
     classifier.fit(train_X, train_Y, learning_rate, max_iter=10_000, plot_costs=False)
     classifier.predict(train_X, train_Y)
 

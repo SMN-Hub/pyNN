@@ -1,4 +1,4 @@
-class LearningRate:
+class LearningRateDecay:
     def __init__(self, alpha, delta):
         self.alpha0 = alpha
         self.delta = delta
@@ -7,7 +7,7 @@ class LearningRate:
         return self.alpha0
 
 
-class LearningRateLinear(LearningRate):
+class LearningRateDecayLinear(LearningRateDecay):
     def __init__(self, alpha, decay):
         super().__init__(alpha, decay)
 
@@ -15,7 +15,7 @@ class LearningRateLinear(LearningRate):
         return self.alpha0 / (1 + self.delta * epoch)
 
 
-class LearningRateExponential(LearningRate):
+class LearningRateDecayExponential(LearningRateDecay):
     def __init__(self, alpha, delta):
         super().__init__(alpha, delta)
 
@@ -23,7 +23,7 @@ class LearningRateExponential(LearningRate):
         return self.alpha0 * pow(self.delta, epoch)
 
 
-class LearningRateRoot(LearningRate):
+class LearningRateDecayRoot(LearningRateDecay):
     def __init__(self, alpha, delta):
         super().__init__(alpha, delta)
 
@@ -31,7 +31,7 @@ class LearningRateRoot(LearningRate):
         return self.alpha0 * self. delta / pow(epoch, 0.5) if epoch > 0 else self.alpha0
 
 
-class LearningRateDiscrete(LearningRate):
+class LearningRateDecayDiscrete(LearningRateDecay):
     def __init__(self, alpha, thresholds):
         super().__init__(alpha, 0)
         self.thresholds = list(thresholds)

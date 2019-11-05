@@ -66,7 +66,7 @@ def main():
     # classifier.add_regularization(deeplearn.DropOutRegularization((0.7, 0.8, 0.9, 1)))
     classifier.add_regularization(deeplearn.MomentumOptimization(0.9))
     # classifier.add_regularization(deeplearn.AdamOptimization())
-    learning_rate = deeplearn.LearningRateLinear(0.1, 0)
+    learning_rate = 0.1  # deeplearn.LearningRateLinear(0.1, 0)
     # learning_rate = deeplearn.LearningRateExponential(0.1, 0.96)
     # learning_rate = deeplearn.LearningRateRoot(0.1, 1)
     # learning_rate = deeplearn.LearningRateDiscrete(0.1, (2000, 2300, 2350, 2400, 2450, 2475))

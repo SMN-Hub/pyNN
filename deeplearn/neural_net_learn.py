@@ -1,9 +1,10 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+
 from deeplearn.activation import ACTIVATIONS, BACKWARD_DERIVATIONS
-from deeplearn.regularization import Regularization
 from deeplearn.dataset_utils import slice_data, shuffle_data
-from deeplearn.learning_rate_decay import LearningRate
+from deeplearn.learning_rate_decay import LearningRateDecayLinear
+from deeplearn.regularization import Regularization
 
 plt.rcParams['image.interpolation'] = 'nearest'
 plt.rcParams['image.cmap'] = 'gray'
@@ -294,17 +295,19 @@ class NeuralNetLearn:
 
         return cost
 
-    def fit(self, X, Y, learning_rate_f: LearningRate, max_iter=2500, plot_costs=True):
+    def fit(self, X, Y, learning_rate_f, max_iter=2500, plot_costs=True):
         """
         Trains a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
 
         Arguments:
         X -- data, numpy array of shape (number of features, number of examples)
         Y -- true "label" vector, of shape (1, number of examples)
-        learning_rate -- learning rate of the gradient descent update rule
+        learning_rate -- learning rate function of the gradient descent update rule, or simple float if constant
         max_iter -- number of iterations of the optimization loop
         """
         self.__reset(True)
+        if type(learning_rate_f) is float:
+            learning_rate_f = LearningRateDecayLinear(learning_rate_f, 0)
         costs = []  # keep track of cost
 
         n_x = X.shape[0]
