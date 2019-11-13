@@ -1,35 +1,50 @@
+import numpy as np
+import random as rn
 import tensorflow as tf
 from tensorflow.keras.layers import Dense, Conv2D, Flatten, Dropout, MaxPooling2D
 
 from cat_training import load_data
 
 
+def set_random_seed(seed):
+    np.random.seed(seed)
+    rn.seed(seed)
+    tf.set_random_seed(seed)
+
+
 def main():
-    print(tf.__version__)
+    # Fix random seed
+    set_random_seed(2)
+    print('Tensorflow version:', tf.__version__)
     train_x_orig, train_y, test_x_orig, test_y, classes = load_data()
-    print(train_x_orig.shape)
+    print('Training set shape:', train_x_orig.shape)
     # Standardize data to have feature values between 0 and 1.
     train_x = train_x_orig / 255.
     test_x = test_x_orig / 255.
+    window = 3
 
     model = tf.keras.Sequential([
         # Adds a densely-connected layer with 20 units to the model:
-        Conv2D(64, 3, padding='same', activation='relu', input_shape=(64, 64, 3)),
-        Dropout(0.2),
+        Conv2D(16, window, padding='same', activation='relu', input_shape=(64, 64, 3)),
+        MaxPooling2D(),  # size=(32, 32, 6)
+        # Dropout(0.2),
         # Add another:
-        Conv2D(12, 3, padding='same', activation='relu'),
-        Dropout(0.2),
-        # Add another:
-        Flatten(),
-        Dense(20, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)),
-        Dense(20, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)),
+        Conv2D(32, window, padding='same', activation='relu'),
+        MaxPooling2D(),  # size=(16, 16, 16)
+        Conv2D(64, window, padding='same', activation='relu'),
+        MaxPooling2D(),  # size=(8, 8, 32)
+        # Flatten:
+        Flatten(),  # size=(2048, )
+        # Adds a densely-connected layers:
+        Dense(120, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)),
+        Dense(84, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)),
         # Add a sigmoid layer with 1 output unit:
         Dense(1, activation='sigmoid')
         ])
     # compile
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     # train
-    model.fit(train_x, train_y.T, epochs=10)  # 0.856
+    model.fit(train_x, train_y.T, epochs=100)  # 0.856
     # evaluate on test set
     print("Evaluating test set")
     outs = model.evaluate(test_x, test_y.T)  # 0.8
