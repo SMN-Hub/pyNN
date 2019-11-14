@@ -89,18 +89,16 @@ def convolution(im_data, conv_filter):
     return conv
 
 
-def main():
-    with Image.open("..\\datasets\\text.png") as im:
+def process_image(file):
+    with Image.open(file) as im:
         im = im.convert('L')
         print(im.format, im.size, im.mode)
         data = np.array(im)
         print(data.shape)
-        conv_filter = np.array([[1, 1, 1], [0, 0, 0], [-1, -1, -1]])
-        conv_data = convolution(data, conv_filter)
+        hori_filter = np.array([[1, 1, 1], [0, 0, 0], [-1, -1, -1]])
+        vert_filter = np.array([[1, 0, -1], [1, 0, -1], [1, 0, -1]])
+        conv_data = convolution(data, hori_filter)
+        conv_data = convolution(conv_data, vert_filter)
         conv_im = Image.new('L', im.size)
         conv_im.putdata(conv_data.reshape(-1))
         conv_im.show()
-
-
-if __name__ == "__main__":
-    main()
