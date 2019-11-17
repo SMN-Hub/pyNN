@@ -1,5 +1,8 @@
 from PIL import Image
 import numpy as np
+from mlscanner.text_structure import Line
+from mlscanner.font_generator import resize_sample_image
+from mlscanner.char_interpreter import CharInterpreter
 
 
 def zero_pad(X, pad):
@@ -89,16 +92,55 @@ def convolution(im_data, conv_filter):
     return conv
 
 
+def process_convolution(data, size):
+    hori_filter = np.array([[1, 1, 1], [0, 0, 0], [-1, -1, -1]])
+    vert_filter = np.array([[1, 0, -1], [1, 0, -1], [1, 0, -1]])
+    conv_data = convolution(data, hori_filter)
+    conv_data = convolution(conv_data, vert_filter)
+    conv_im = Image.new('L', size)
+    conv_im.putdata(conv_data.reshape(-1))
+    conv_im.show()
+
+
+def generate_section(data, axis):
+    line_mins = np.min(data, axis)
+    print(line_mins.shape)
+    print(line_mins)
+    top_blank , top_fill = 0, 0
+    def check_blank(x): return x >= 200
+    is_blank = check_blank(line_mins[0])
+    for line, val in enumerate(line_mins):
+        new_is_blank = check_blank(val)
+        if new_is_blank and not is_blank:  # text => blank
+            top = top_fill - top_blank
+            height = line - top_fill
+            line_data = data[top_fill:line, :] if axis == 1 else data[:, top_fill:line]
+            top_blank = line
+            yield (top, height, line_data)
+        elif not new_is_blank and is_blank:  # blank => text
+            top_fill = line
+        is_blank = new_is_blank
+    if not is_blank:
+        top = top_fill - top_blank
+        height = line - top_fill
+        line_data = data[top_fill:line, :] if axis == 1 else data[:, top_fill:line]
+        yield (top, height, line_data)
+
+
 def process_image(file):
     with Image.open(file) as im:
         im = im.convert('L')
         print(im.format, im.size, im.mode)
         data = np.array(im)
         print(data.shape)
-        hori_filter = np.array([[1, 1, 1], [0, 0, 0], [-1, -1, -1]])
-        vert_filter = np.array([[1, 0, -1], [1, 0, -1], [1, 0, -1]])
-        conv_data = convolution(data, hori_filter)
-        conv_data = convolution(conv_data, vert_filter)
-        conv_im = Image.new('L', im.size)
-        conv_im.putdata(conv_data.reshape(-1))
-        conv_im.show()
+        # split in lines
+        (top, height, line_data) = next(generate_section(data, 1))
+        line = Line(top, height, line_data)
+        # split in chars
+        text = ""
+        interpreter = CharInterpreter()
+        for (left, width, char_data) in generate_section(line_data, 0):
+            char_im = resize_sample_image(char_data)
+            char_data = np.array(char_im, dtype=float).reshape((1, 18, 18, 1))
+            text += interpreter.predict(char_data)
+        return text
