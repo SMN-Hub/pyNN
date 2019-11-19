@@ -1,8 +1,9 @@
-from PIL import Image
 import numpy as np
-from mlscanner.text_structure import Line
-from mlscanner.font_generator import resize_sample_image
+from PIL import Image
+
 from mlscanner.char_interpreter import CharInterpreter
+from mlscanner.font_generator import resize_sample_image, FULL_SIZE
+from mlscanner.text_structure import Line, Char
 
 
 def zero_pad(X, pad):
@@ -131,16 +132,26 @@ def process_image(file):
     with Image.open(file) as im:
         im = im.convert('L')
         print(im.format, im.size, im.mode)
+        im.show()
         data = np.array(im)
         print(data.shape)
         # split in lines
         (top, height, line_data) = next(generate_section(data, 1))
         line = Line(top, height, line_data)
         # split in chars
+        chars = []
+        for (left, width, char_data) in generate_section(line_data, 0):
+            chars.append(Char(left, width, char_data))
+        # interpret
         text = ""
         interpreter = CharInterpreter()
-        for (left, width, char_data) in generate_section(line_data, 0):
+        line_image = Image.new("L", ((FULL_SIZE+1)*len(chars), FULL_SIZE))
+        for idx, (left, width, char_data) in enumerate(generate_section(line_data, 0)):
+            chars.append(Char(left, width, char_data))
             char_im = resize_sample_image(char_data)
+            x = int((FULL_SIZE+1) * idx)
+            line_image.paste(char_im, (x, 0))
             char_data = np.array(char_im, dtype=float).reshape((1, 18, 18, 1))
             text += interpreter.predict(char_data)
+        line_image.show()
         return text
