@@ -123,17 +123,22 @@ def process_image(file):
             chars.append(Char(left, width, char_data))
             left_average += left
         left_average = left_average / len(chars) + 1
-        # interpret
-        text = ""
+        # predict
         interpreter = CharInterpreter()
         line_image = Image.new("L", ((FULL_SIZE+1)*len(chars), FULL_SIZE))
+        char_data_array = []
         for idx, char in enumerate(chars):
             char_im = resize_sample_image(char.data)
             x = int((FULL_SIZE+1) * idx)
             line_image.paste(char_im, (x, 0))
-            char_data = np.array(char_im, dtype=float).reshape((1, 18, 18, 1))
+            char_data = np.array(char_im, dtype=float).reshape((18, 18, 1))
+            char_data_array.append(char_data)
+        predictions = interpreter.predict(np.array(char_data_array))
+        line_image.save("../out/detected_sample.png", "PNG")
+        # interpret
+        text = ""
+        for idx, char in enumerate(chars):
             if char.left > left_average:
                 text += " "
-            text += interpreter.predict(char_data)
-        line_image.save("../out/detected_sample.png", "PNG")
+            text += predictions[idx]
         return text
