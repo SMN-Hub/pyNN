@@ -45,4 +45,4 @@ def scan_text_from_image(file):
 
 
 if __name__ == "__main__":
-    scan_text_from_image("..\\datasets\\text.png")
+    scan_text_from_image("..\\assets\\text.png")

@@ -82,7 +82,14 @@ def main():
     fonts = list_fonts()
     for f in fonts:
         print(f)
-    write_font_image("A", 'arial.ttf', '.')
+    # write_font_image("A", 'arial.ttf', '.')
+    sample_text = "Inthelastvideo,youlearnedhowtouseconvolutionalimplementationofslidingwindows."
+    line_image = Image.new("L", ((FULL_SIZE + 1) * len(sample_text), FULL_SIZE))
+    for idx, c in enumerate(sample_text):
+        char_im = generate_font_image(c, 'OpenSans-Regular.ttf')
+        x = int((FULL_SIZE + 1) * idx)
+        line_image.paste(char_im, (x, 0))
+    line_image.save("../out/generated_sample.png", "PNG")
 
 
 if __name__ == "__main__":

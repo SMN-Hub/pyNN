@@ -132,7 +132,7 @@ def process_image(file):
     with Image.open(file) as im:
         im = im.convert('L')
         print(im.format, im.size, im.mode)
-        im.show()
+        # im.show()
         data = np.array(im)
         print(data.shape)
         # split in lines
@@ -153,5 +153,5 @@ def process_image(file):
             line_image.paste(char_im, (x, 0))
             char_data = np.array(char_im, dtype=float).reshape((1, 18, 18, 1))
             text += interpreter.predict(char_data)
-        line_image.show()
+        line_image.save("../out/detected_sample.png", "PNG")
         return text
