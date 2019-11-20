@@ -3,6 +3,7 @@ from PIL import Image
 
 from mlscanner.char_interpreter import CharInterpreter
 from mlscanner.font_generator import resize_sample_image, FULL_SIZE
+from mlscanner.image_splitter import ImageSplitter
 from mlscanner.text_structure import Line, Char
 
 
@@ -103,31 +104,6 @@ def process_convolution(data, size):
     conv_im.show()
 
 
-def generate_section(data, axis):
-    line_mins = np.min(data, axis)
-    print(line_mins.shape)
-    print(line_mins)
-    top_blank , top_fill = 0, 0
-    def check_blank(x): return x >= 200
-    is_blank = check_blank(line_mins[0])
-    for line, val in enumerate(line_mins):
-        new_is_blank = check_blank(val)
-        if new_is_blank and not is_blank:  # text => blank
-            top = top_fill - top_blank
-            height = line - top_fill
-            line_data = data[top_fill:line, :] if axis == 1 else data[:, top_fill:line]
-            top_blank = line
-            yield (top, height, line_data)
-        elif not new_is_blank and is_blank:  # blank => text
-            top_fill = line
-        is_blank = new_is_blank
-    if not is_blank:
-        top = top_fill - top_blank
-        height = line - top_fill
-        line_data = data[top_fill:line, :] if axis == 1 else data[:, top_fill:line]
-        yield (top, height, line_data)
-
-
 def process_image(file):
     with Image.open(file) as im:
         im = im.convert('L')
@@ -136,22 +112,28 @@ def process_image(file):
         data = np.array(im)
         print(data.shape)
         # split in lines
-        (top, height, line_data) = next(generate_section(data, 1))
+        line_splitter = ImageSplitter(data, 1)
+        (top, height, line_data) = next(line_splitter.sections_generator())
         line = Line(top, height, line_data)
         # split in chars
         chars = []
-        for (left, width, char_data) in generate_section(line_data, 0):
+        left_average = 0
+        char_splitter = ImageSplitter(line_data, 0)
+        for (left, width, char_data) in char_splitter.sections_generator():
             chars.append(Char(left, width, char_data))
+            left_average += left
+        left_average = left_average / len(chars) + 1
         # interpret
         text = ""
         interpreter = CharInterpreter()
         line_image = Image.new("L", ((FULL_SIZE+1)*len(chars), FULL_SIZE))
-        for idx, (left, width, char_data) in enumerate(generate_section(line_data, 0)):
-            chars.append(Char(left, width, char_data))
-            char_im = resize_sample_image(char_data)
+        for idx, char in enumerate(chars):
+            char_im = resize_sample_image(char.data)
             x = int((FULL_SIZE+1) * idx)
             line_image.paste(char_im, (x, 0))
             char_data = np.array(char_im, dtype=float).reshape((1, 18, 18, 1))
+            if char.left > left_average:
+                text += " "
             text += interpreter.predict(char_data)
         line_image.save("../out/detected_sample.png", "PNG")
         return text
