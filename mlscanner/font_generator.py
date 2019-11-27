@@ -105,9 +105,11 @@ def write_font_image(text, fontname, outputFolder):
 
 
 def list_fonts():
+    fonts = []
     for file in os.listdir('C:\\Windows\\Fonts'):
         if file.endswith(".ttf") and file not in excludedFonts:
-            yield file
+            fonts.append(file)
+    return fonts
 
 
 def true_array(size, trueIndex):
@@ -129,11 +131,7 @@ def chars_dataset_generator(features):
     return generator
 
 
-def main():
-    fonts = list_fonts()
-    for f in fonts:
-        print(f)
-    # write_font_image("A", 'arial.ttf', '.')
+def generate_data_augmented_sample():
     sample_text = "Inthelastvideo,youlearnedhowtouseconvolutionalimplementationofslidingwindows."
     line_image = Image.new("L", ((FULL_SIZE + 1) * len(sample_text), (FULL_SIZE + 1) * 12))
     for idx, c in enumerate(sample_text):
@@ -142,6 +140,27 @@ def main():
             y = int((FULL_SIZE + 1) * idx2)
             line_image.paste(char_im, (x, y))
     line_image.save("../out/generated_sample.png", "PNG")
+
+
+def generate_test_sample(sample_text, max_font=None):
+    text_size = 14
+    fonts = list_fonts()
+    if max_font is not None:
+        fonts = fonts[:max_font-1]
+    image = Image.new("L", ((FULL_SIZE + 1) * len(sample_text), (FULL_SIZE + 1) * len(fonts)), "white")
+    draw = ImageDraw.Draw(image)
+    for idx, fontname in enumerate(fonts):
+        font = ImageFont.truetype(fontname, text_size)
+        font_width, font_height = font.getsize(sample_text)
+        y = int((FULL_SIZE + 1) * idx)
+        draw.text((0, y + (FULL_SIZE - font_height) / 2), sample_text, font=font, fill="black")
+        print(fontname)
+    image.save("../out/generated_test.png", "PNG")
+
+
+def main():
+    sample_text = "In the last video, you learned how to use 125x250 convolutional sliding windows. THAT WAS FUN!"
+    generate_test_sample(sample_text, 13)
 
 
 if __name__ == "__main__":

@@ -33,13 +33,14 @@ Steps:
 from mlscanner.image_processor import process_image
 
 
-def scan_text_from_image(file):
+def scan_text_from_image(file, debug=False):
     """
     Scan an image to determined formatted text inside
+    :param debug: if true, produces an output debug image in 'out/detected_debug.png'
     :param file: the image file to scan
     :return: the scanned text
     """
-    text = process_image(file)
+    text = process_image(file, debug)
     print(text)
     return text
 

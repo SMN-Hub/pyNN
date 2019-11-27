@@ -1,0 +1,1 @@
+from mlscanner.image_scanner import scan_text_from_image

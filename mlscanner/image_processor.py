@@ -4,7 +4,7 @@ from PIL import Image
 from mlscanner.char_interpreter import CharInterpreter
 from mlscanner.font_generator import resize_sample_image, FULL_SIZE
 from mlscanner.image_splitter import ImageSplitter
-from mlscanner.text_structure import Line, Char
+from mlscanner.text_structure import Line, Char, Paragraph
 
 
 def zero_pad(X, pad):
@@ -104,17 +104,34 @@ def process_convolution(data, size):
     conv_im.show()
 
 
-def process_image(file):
+def process_image(file, debug=False):
     with Image.open(file) as im:
         im = im.convert('L')
         print(im.format, im.size, im.mode)
         # im.show()
         data = np.array(im)
         print(data.shape)
-        # split in lines
-        line_splitter = ImageSplitter(data, 1)
-        (top, height, line_data) = next(line_splitter.sections_generator())
-        line = Line(top, height, line_data)
+        # split in lines & chars
+        paragraph = split_text_structure(data)
+        text = ""
+        paragraph_shape = paragraph.get_shape()
+        debug_image = Image.new("L", ((FULL_SIZE+1)*paragraph_shape[1], ((FULL_SIZE+1)*paragraph_shape[0])), "white") if debug else None
+
+        interpreter = CharInterpreter()
+        for idx, line in enumerate(paragraph.lines):
+            if len(text) > 0:
+                text += "\n"
+            text += process_line(line, interpreter, idx, debug_image)
+        if debug:
+            debug_image.save("../out/detected_debug.png", "PNG")
+        return text
+
+
+def split_text_structure(data):
+    lines = []
+    # split in lines
+    line_splitter = ImageSplitter(data, 1)
+    for top, height, line_data in line_splitter.sections_generator():
         # split in chars
         chars = []
         left_average = 0
@@ -123,22 +140,27 @@ def process_image(file):
             chars.append(Char(left, width, char_data))
             left_average += left
         left_average = left_average / len(chars) + 1
-        # predict
-        interpreter = CharInterpreter()
-        line_image = Image.new("L", ((FULL_SIZE+1)*len(chars), FULL_SIZE))
-        char_data_array = []
-        for idx, char in enumerate(chars):
-            char_im = resize_sample_image(char.data)
-            x = int((FULL_SIZE+1) * idx)
-            line_image.paste(char_im, (x, 0))
-            char_data = np.array(char_im, dtype=float).reshape((18, 18, 1))
-            char_data_array.append(char_data)
-        predictions = interpreter.predict(np.array(char_data_array))
-        line_image.save("../out/detected_sample.png", "PNG")
-        # interpret
-        text = ""
-        for idx, char in enumerate(chars):
-            if char.left > left_average:
-                text += " "
-            text += predictions[idx]
-        return text
+        line = Line(top, height, line_data, chars, left_average)
+        lines.append(line)
+    return Paragraph(lines)
+
+
+def process_line(line, interpreter: CharInterpreter, line_idx, debug_output_image):
+    # predict
+    char_data_array = []
+    for idx, char in enumerate(line.chars):
+        char_im = resize_sample_image(char.data)
+        if debug_output_image is not None:
+            x = int((FULL_SIZE + 1) * idx)
+            y = int((FULL_SIZE + 1) * line_idx)
+            debug_output_image.paste(char_im, (x, y))
+        char_data = np.array(char_im, dtype=float).reshape((18, 18, 1))
+        char_data_array.append(char_data)
+    predictions = interpreter.predict(np.array(char_data_array))
+    # interpret
+    text = ""
+    for idx, char in enumerate(line.chars):
+        if char.left > line.left_average:
+            text += " "
+        text += predictions[idx]
+    return text
