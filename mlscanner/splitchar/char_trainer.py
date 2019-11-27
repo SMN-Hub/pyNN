@@ -1,7 +1,9 @@
-import numpy as np
 import random as rn
+
+import numpy as np
 import tensorflow as tf
-from tensorflow.keras.layers import Dense, Conv2D, Flatten, Dropout, MaxPooling2D
+from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPooling2D
+
 from mlscanner.font_generator import chars_dataset_generator
 
 features = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,;:!?'\"-+*/"
@@ -42,9 +44,9 @@ class CharTrainer:
         # Split train/dev/test sets
         test_ratio_percent = 5
         data = data.shuffle(10, reshuffle_each_iteration=False)
-        is_test = lambda x, y: x % 100 < test_ratio_percent
-        is_train = lambda x, y: x % 100 >= test_ratio_percent
-        recover = lambda x, y: y
+        is_test = lambda idx, dt: idx % 100 < test_ratio_percent
+        is_train = lambda idx, dt: idx % 100 >= test_ratio_percent
+        recover = lambda idx, dt: dt
         test_dataset = data.enumerate().filter(is_test).map(recover)
         train_dataset = data.enumerate().filter(is_train).map(recover)
         # Train model

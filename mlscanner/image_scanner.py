@@ -31,16 +31,18 @@ Steps:
 * Font colors from original image
 """
 from mlscanner.image_processor import process_image
+from mlscanner.sliding_method import SlidingMethod
 
 
-def scan_text_from_image(file, debug=False):
+def scan_text_from_image(file, method: SlidingMethod, debug=False):
     """
     Scan an image to determined formatted text inside
+    :param method:  Sliding window method: SplitChar for hand split characters, ConvSlide for convolutional horizontal anchor box sliding
     :param debug: if true, produces an output debug image in 'out/detected_debug.png'
     :param file: the image file to scan
     :return: the scanned text
     """
-    text = process_image(file, debug)
+    text = process_image(file, method, debug)
     print(text)
     return text
 

@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from mlscanner.char_trainer import features, model_file
+from mlscanner.splitchar.char_trainer import features, model_file
 
 
 class CharInterpreter:

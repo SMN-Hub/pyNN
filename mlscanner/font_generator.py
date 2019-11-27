@@ -4,7 +4,7 @@ from enum import Enum, auto
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-from mlscanner.image_splitter import ImageSplitter
+from mlscanner.splitchar.image_splitter import ImageSplitter
 
 FULL_SIZE = 18
 TEXT_SIZE = 16

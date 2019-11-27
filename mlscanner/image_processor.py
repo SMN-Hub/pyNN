@@ -1,9 +1,10 @@
 import numpy as np
 from PIL import Image
 
-from mlscanner.char_interpreter import CharInterpreter
 from mlscanner.font_generator import resize_sample_image, FULL_SIZE
-from mlscanner.image_splitter import ImageSplitter
+from mlscanner.sliding_method import SlidingMethod
+from mlscanner.splitchar.char_interpreter import CharInterpreter
+from mlscanner.splitchar.image_splitter import ImageSplitter
 from mlscanner.text_structure import Line, Char, Paragraph
 
 
@@ -104,8 +105,9 @@ def process_convolution(data, size):
     conv_im.show()
 
 
-def process_image(file, debug=False):
+def process_image(file, method: SlidingMethod, debug=False):
     with Image.open(file) as im:
+        print("Original image", im.format, im.size, im.mode)
         im = im.convert('L')
         print(im.format, im.size, im.mode)
         # im.show()
