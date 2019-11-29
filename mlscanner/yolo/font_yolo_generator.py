@@ -1,16 +1,16 @@
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from mlscanner.font_generator import FULL_SIZE, ReScale, TEXT_SIZE, get_font_text_size, RePlace, place_font_image
 from mlscanner.splitchar.char_trainer import FEATURES
 from mlscanner.splitchar.image_splitter import ImageSplitter
-
-from mlscanner.font_generator import FULL_SIZE, ReScale, TEXT_SIZE, get_font_text_size, list_fonts, RePlace, place_font_image
 
 
 class YoloDatasetGenerator:
     def __init__(self, features):
         self.features = features
         self.feature_dict = {c: idx for idx, c in enumerate(features)}
+        self.feature_size = len(features) + 2  # +2 for character pos & size
         self.current_fontname = None
         self.current_font = None
 
@@ -18,6 +18,7 @@ class YoloDatasetGenerator:
         if fontname is not self.current_fontname:
             self.current_fontname = fontname
             self.current_font = ImageFont.truetype(fontname, TEXT_SIZE)
+            print(fontname)
 
     @staticmethod
     def _generate_font_image(text, image_size, norm_size, font, text_pos):
@@ -63,9 +64,9 @@ class YoloDatasetGenerator:
             (left, width, _) = splitter.full_section()
             bboxes.append((left+round(width/2), width+1, self.feature_dict[char]))
 
-        if norm_width < window * FULL_SIZE:
+        if norm_width < window:
             # resize canvas to fit minimum size
-            canvas_image = Image.new("L", (window * FULL_SIZE, FULL_SIZE), "white")
+            canvas_image = Image.new("L", (window, FULL_SIZE), "white")
             canvas_image.paste(image)
             image = canvas_image
         return image, bboxes
@@ -82,34 +83,63 @@ class YoloDatasetGenerator:
             for place in RePlace:
                 yield (place_font_image(image, False, place), bboxes)
 
-    def get_dataset_generator(self, training_text: str, fontnames, window, step):
+    def get_dataset_generator(self, training_text: str, fontnames, window, step, augment: True):
         def generator():
             grid_count = int(window / step)
-            fsize = grid_count * (len(self.features) + 2)  # +2 for pos, width
             lines = training_text.splitlines()
             for fontname in fontnames:
-                print(fontname)
+                self._set_current_font(fontname)
                 for line in lines:
-                    for image, bboxes in self.generate_augmented_font_image(line, fontname, window):
+                    data_set = self.generate_augmented_font_image(line, fontname, window) if augment else [self._generate_font_image_bbox(line, window)]
+                    for image, bboxes in data_set:
+                        bboxes_dict = self._build_bbox_grid(bboxes, step)
                         image_data = np.array(image)
-                        for slide in range(grid_count):
-                            yield self.slide_window(image_data, bboxes, window, slide)
+                        for grid_slide in range(int(image_data.shape[1]/step)):
+                            yield self.slide_window(image_data, bboxes_dict, window, grid_slide, grid_count, step)
         return generator
 
-    def slide_window(self, image_data, bboxes, window, slide):
-        x = image_data.reshape((FULL_SIZE, window, 1))
-        y = np.zeros(fsize)
+    def slide_window(self, image_data, bboxes_dict, window, grid_slide, grid_count, step):
+        start_pos = grid_slide * step
+        window_data = np.roll(image_data, -start_pos, axis=1)[:, 0:window]
+        x = window_data.reshape((FULL_SIZE, window, 1))
+        y = np.zeros(self.feature_size * grid_count, dtype=float)
+        for i in range(grid_count):
+            # compute rolling grid number
+            grid_id = grid_slide + i
+            if grid_id >= grid_count:
+                grid_id -= grid_count
+            if grid_id in bboxes_dict:
+                (pos, width, fidx) = bboxes_dict[grid_id]
+                y[i * self.feature_size + fidx] = 1.
+                y[(i+1) * self.feature_size - 2] = pos
+                y[(i+1) * self.feature_size - 1] = width
+        return x, y
+
+    @staticmethod
+    def _build_bbox_grid(bboxes, step):
+        bboxes_dict = {}
+        for (pos, width, fidx) in bboxes:
+            grid_id = int(pos / step)
+            bboxes_dict[grid_id] = (float((pos-grid_id)/step), float(width/step), fidx)
+        return bboxes_dict
 
 
 def test_augmented_image():
     gen = YoloDatasetGenerator(FEATURES)
-    sample_text = "In the last video"
-    full_image = Image.new("L", (FULL_SIZE * len(sample_text), (FULL_SIZE+1) * len(ReScale) * len(RePlace)))
-    for idx, (image, bboxes) in enumerate(gen.generate_augmented_font_image(sample_text, "../assets/OpenSans-Regular.ttf", 6 * FULL_SIZE)):
+    sample_text = "In the last video, you"
+    window = 6 * FULL_SIZE
+    gen = gen.get_dataset_generator(sample_text, ["../assets/OpenSans-Regular.ttf"], window, 3, False)
+    images = []
+    for (x, y) in gen():
+        image = Image.new("L", (window, FULL_SIZE))
+        image.putdata(x.reshape(-1))
+        images.append(image)
+        print(y)
+    full_image = Image.new("L", (window, (FULL_SIZE+1) * len(images)))
+    for idx, image in enumerate(images):
         y = int((FULL_SIZE+1) * idx)
         full_image.paste(image, (0, y))
         print('Dataset', idx)
-        gen.print_bounding_boxes(bboxes)
     full_image.save("../out/generated_yolo_sample.png", "PNG")
 
 
