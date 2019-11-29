@@ -6,7 +6,7 @@ from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPooling2D
 
 from mlscanner.font_generator import chars_dataset_generator
 
-features = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,;:!?'\"-+*/"
+FEATURES = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,;:!?'\"-+*/"
 model_file = '../datasets/chars_model.h5'
 print('Tensorflow version:', tf.__version__)
 
@@ -35,11 +35,11 @@ class CharTrainer:
             Dense(120, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)),
             Dense(84, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(0.01)),
             # Add a sigmoid layer with 1 output unit:
-            Dense(len(features), activation='sigmoid')  # size=(76, )
+            Dense(len(FEATURES), activation='sigmoid')  # size=(76, )
         ])
 
     def fit(self):
-        data = tf.data.Dataset.from_generator(chars_dataset_generator(features), (tf.int32, tf.int32), (tf.TensorShape([18,18,1]), tf.TensorShape([len(features)])))
+        data = tf.data.Dataset.from_generator(chars_dataset_generator(FEATURES), (tf.int32, tf.int32), (tf.TensorShape([18, 18, 1]), tf.TensorShape([len(FEATURES)])))
         # Data augmentation
         # Split train/dev/test sets
         test_ratio_percent = 5

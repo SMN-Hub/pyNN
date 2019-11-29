@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from mlscanner.splitchar.char_trainer import features, model_file
+from mlscanner.splitchar.char_trainer import FEATURES, model_file
 
 
 class CharInterpreter:
@@ -15,7 +15,7 @@ class CharInterpreter:
         scores = []
         for prediction in predictions:
             n = np.argmax(prediction)
-            letters += features[n]
-            scores.append("\"" + features[n] + "\": " + str(prediction[n]))
+            letters += FEATURES[n]
+            scores.append(FEATURES[n] + ": " + str(prediction[n]))
         print(scores)
         return letters
