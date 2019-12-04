@@ -23,6 +23,10 @@ class YoloConfiguration:
         return self.input_shape[0]
 
     @property
+    def classes(self):
+        return len(self.features)
+
+    @property
     def columns(self):
         return self.input_shape[1]
 

@@ -1,12 +1,6 @@
-ABCDEFGHIJKLM
-NOPQRSTUVWXYZ
-abcdefghijklm
-nopqrstuvwxyz
-0123456789
-.,;:!?'"-+*/
-In the last
-I'll die
-IT WAS FINE
-79x1200 * 56
-you are 3 of
-+ 48 -5/1.20
+ABCDEFGHIJKLMNOPQRSTUVWXYZ
+abcdefghijklmnopqrstuvwxyz
+0123456789.,;:!?'"-+*/
+In the last I'll die for you
+IT WAS FINE 79x1200 * 56
+you are 3 of + 48 -5/1.20
