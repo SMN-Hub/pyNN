@@ -23,3 +23,7 @@ class YoloTrainer:
             Conv2D(conf.feature_size, 1, padding='same', activation='relu'),
             Conv2D(conf.feature_size, 1, padding='same', activation='relu'),
         ])
+
+    def get_loss_fn(self, score_thresh=0.5, iou_thresh=0.5):
+        def yolo_loss(y_true, y_pred):
+            pass
