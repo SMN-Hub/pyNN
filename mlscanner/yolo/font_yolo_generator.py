@@ -11,12 +11,12 @@ class YoloConfiguration:
         self.features = features
         self.input_shape = input_shape
         self.step = step
-        self.grid_count = int(self.columns / step)
+        self.grid_count = self.columns // step
         self.feature_dict = {c: idx for idx, c in enumerate(features)}
         self.feature_size = len(features) + 3  # +3 for pc, pos & size
 
     def __str__(self):
-        return f"Yolo configuration will generate {self.input_shape} images with step {self.step} => {self.grid_count} calls"
+        return f"Yolo configuration will generate {self.input_shape} images with step {self.step} => {self.grid_count} cells"
 
     @property
     def lines(self):
@@ -121,7 +121,7 @@ class YoloDatasetGenerator:
                     data_set = self.generate_augmented_font_image(line, fontname) if augment else [self._generate_font_image_bbox(line)]
                     for image, bboxes in data_set:
                         bboxes_dict = self._build_bbox_grid(bboxes, self.conf.step)
-                        image_data = np.array(image)
+                        image_data = np.array(image, dtype=float)
                         for grid_slide in range(int(image_data.shape[1]/self.conf.step)):
                             yield self.slide_window(image_data, bboxes_dict, grid_slide)
         return generator
@@ -130,12 +130,12 @@ class YoloDatasetGenerator:
         feature_size = self.conf.feature_size
         step = self.conf.step
         grid_count = self.conf.grid_count
-        window = self.conf.columns
+        columns = self.conf.columns
 
         start_pos = grid_slide * step
-        window_data = np.roll(image_data, -start_pos, axis=1)[:, 0:window]
-        x = window_data.reshape((FULL_SIZE, window, 1))
-        y = np.zeros(feature_size * grid_count, dtype=float)
+        window_data = np.roll(image_data, -start_pos, axis=1)[:, 0:columns]
+        x = self._normalize_training_image(window_data)
+        y = np.zeros((grid_count, feature_size), dtype=float)
         for i in range(grid_count):
             # compute rolling grid number
             grid_id = grid_slide + i
@@ -143,11 +143,11 @@ class YoloDatasetGenerator:
                 grid_id -= grid_count
             if grid_id in bboxes_dict:
                 (pos, width, fidx) = bboxes_dict[grid_id]
-                y[i * feature_size] = 1.  # pc
-                y[i * feature_size + fidx + 1] = 1.  # classification
-                y[(i+1) * feature_size - 2] = pos  # character position in cell
-                y[(i+1) * feature_size - 1] = width  # character width in cell
-        return x, y
+                y[i][0] = 1.  # pc
+                y[i][fidx + 1] = 1.  # classification
+                y[i][feature_size - 2] = pos  # character position in cell
+                y[i][feature_size - 1] = width  # character width in cell
+        return x, np.array([y], dtype=float)
 
     @staticmethod
     def _build_bbox_grid(bboxes, step):
@@ -156,6 +156,16 @@ class YoloDatasetGenerator:
             grid_id = int(pos / step)
             bboxes_dict[grid_id] = (float((pos-grid_id)/step), float(width/step), fidx)
         return bboxes_dict
+
+    @staticmethod
+    def _normalize_training_image(image_data):
+        # normalize to [0,1]
+        image_data = image_data / 255
+        # negate image (0=no data, 1=font - so further ZeroPadding won't add relevant data)
+        image_data = 1. - image_data
+        # reshape to add channel (grey scale)
+        x = image_data.reshape(image_data.shape + (1,))
+        return x
 
 
 def test_augmented_image():

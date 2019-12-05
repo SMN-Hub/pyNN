@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Conv2D, MaxPooling2D
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, ZeroPadding2D
 
 from mlscanner.font_generator import FULL_SIZE, list_fonts
 from mlscanner.splitchar.char_trainer import set_random_seed, FEATURES
@@ -20,8 +20,10 @@ class YoloTrainer:
             Conv2D(16, kernel, padding='same', activation='relu', input_shape=conf.input_shape),  # size=(18, 18*18, 1) # 18*6 cells
             MaxPooling2D(pool_size=(3, 3)),  # size=(6, 6*18, 16)
             Conv2D(32, kernel, padding='same', activation='relu'),
+            ZeroPadding2D((0, 1)),
             MaxPooling2D(pool_size=(3, 3), strides=(3, 1)),  # size=(2, 6*18, 32)
             Conv2D(64, kernel, padding='same', activation='relu'),
+            ZeroPadding2D(((0, 0), (0, 1))),
             MaxPooling2D(pool_size=(2, 2), strides=(2, 1)),  # size=(1, 6*18, 64)
             # Convolution implementation of sliding window:
             Conv2D(conf.feature_size, 1, padding='same', activation='relu'),
@@ -34,6 +36,9 @@ class YoloTrainer:
 
         def yolo_loss(y_true, y_pred):
             # y_pred: (batch_size, grid, grid, (pc, ...cls, x, w)) = N x 1 x 105 x 77
+            # reduce dimensions
+            # y_true = tf.squeeze(y_true)
+            # y_pred = tf.squeeze(y_pred, 1)
             pc_pred, cls_pred, pos_pred, width_pred = tf.split(y_pred, (1, self.conf.classes, 1, 1), axis=-1)
             pc_true, cls_true, pos_true, width_true = tf.split(y_true, (1, self.conf.classes, 1, 1), axis=-1)
             # calculate all masks
@@ -45,10 +50,10 @@ class YoloTrainer:
             pos_loss = bce(pos_true, pos_pred)
             width_loss = bce(width_true, width_pred)
             # sum over (batch, gridx, gridy, anchors) => (batch, 1)
-            # pc_loss = tf.reduce_sum(pc_loss, axis=(1, 2, 3))
-            # cls_loss = tf.reduce_sum(cls_loss, axis=(1, 2, 3))
-            # pos_loss = tf.reduce_sum(pos_loss, axis=(1, 2, 3))
-            # width_loss = tf.reduce_sum(width_loss, axis=(1, 2, 3))
+            pc_loss = tf.reduce_sum(pc_loss, axis=(1, 2, 3))
+            cls_loss = tf.reduce_sum(cls_loss, axis=(1, 2, 3))
+            pos_loss = tf.reduce_sum(pos_loss, axis=(1, 2, 3))
+            width_loss = tf.reduce_sum(width_loss, axis=(1, 2, 3))
             return pc_loss + cls_loss + pos_loss + width_loss
 
         return yolo_loss
@@ -57,7 +62,7 @@ class YoloTrainer:
         with open(TRAINING_FILE, 'r') as f:
             training_phrases = f.read()
         gen = YoloDatasetGenerator(self.conf)
-        data = tf.data.Dataset.from_generator(gen.get_dataset_generator(training_phrases, list_fonts(), augment=False), (tf.int32, tf.int32), (tf.TensorShape(list(self.conf.input_shape)), tf.TensorShape([self.conf.feature_size])))
+        data = tf.data.Dataset.from_generator(gen.get_dataset_generator(training_phrases, list_fonts(), augment=False), (tf.float32, tf.float32), (tf.TensorShape(list(self.conf.input_shape)), tf.TensorShape([1, self.conf.grid_count, self.conf.feature_size])))
         # Data augmentation
         # Split train/dev/test sets
         test_ratio_percent = 5
