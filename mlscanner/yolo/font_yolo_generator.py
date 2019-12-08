@@ -147,6 +147,7 @@ class YoloDatasetGenerator:
                 y[i][fidx + 1] = 1.  # classification
                 y[i][feature_size - 2] = pos  # character position in cell
                 y[i][feature_size - 1] = width  # character width in cell
+        assert not np.any(np.isnan(y))
         return x, np.array([y], dtype=float)
 
     @staticmethod
