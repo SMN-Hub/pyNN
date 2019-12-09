@@ -1,4 +1,5 @@
 import os
+import shutil
 from enum import Enum, auto
 
 import numpy as np
@@ -9,6 +10,7 @@ from mlscanner.splitchar.image_splitter import ImageSplitter
 FULL_SIZE = 18
 TEXT_SIZE = 16
 excludedFonts = {"symbol.ttf", "wingding.ttf", "webdings.ttf", "MTEXTRA.TTF", "BSSYM7.TTF"}
+FONT_FOLDER = '../assets/trainingfonts'
 
 
 class ReScale(Enum):
@@ -95,12 +97,18 @@ def write_font_image(text, fontname, outputFolder):
     image.save(filename, "PNG")
 
 
-def list_fonts():
+def list_fonts(from_os=False):
+    dir = 'C:/Windows/Fonts' if from_os else FONT_FOLDER
     fonts = []
-    for file in os.listdir('C:\\Windows\\Fonts'):
+    for file in os.listdir(dir):
         if file.endswith(".ttf") and file not in excludedFonts:
-            fonts.append(file)
+            fonts.append(dir + '/' + file)
     return fonts
+
+
+def copy_fonts():
+    for file in list_fonts(True):
+        shutil.copy2(file, FONT_FOLDER)
 
 
 def true_array(size, trueIndex):
@@ -150,8 +158,9 @@ def generate_test_sample(sample_text, max_font=None):
 
 
 def main():
-    sample_text = "In the last video, you learned how to use 125x250 convolutional sliding windows. THAT WAS FUN!"
-    generate_test_sample(sample_text, 13)
+    copy_fonts()
+    # sample_text = "In the last video, you learned how to use 125x250 convolutional sliding windows. THAT WAS FUN!"
+    # generate_test_sample(sample_text, 13)
 
 
 if __name__ == "__main__":
