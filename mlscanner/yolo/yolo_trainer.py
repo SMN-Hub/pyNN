@@ -1,13 +1,14 @@
+import os.path
 import tensorflow as tf
 from tensorflow.keras.layers import BatchNormalization, Conv2D, Input, LeakyReLU, MaxPooling2D, ZeroPadding2D
 
 from mlscanner.font_generator import FULL_SIZE, list_fonts
 from mlscanner.splitchar.char_trainer import set_random_seed, FEATURES
-from mlscanner.yolo.font_yolo_generator import YoloConfiguration, YoloDatasetGenerator
+from mlscanner.yolo.font_yolo_generator import YoloDatasetGenerator
+from mlscanner.yolo.yolo_configuration import YoloConfiguration, decode_conf, encode_conf
 
 MODEL_FILE = '../datasets/yolo_model.h5'
 TRAINING_FILE = '../datasets/words_manual.txt'
-print('Tensorflow version:', tf.__version__)
 
 
 def normalize_iterator(value):
@@ -20,10 +21,15 @@ def normalize_iterator(value):
 
 
 class YoloTrainer:
-    def __init__(self, conf: YoloConfiguration, seed):
+    def __init__(self, conf: YoloConfiguration, seed, resume):
         set_random_seed(seed)
         self.conf = conf
-        self.model = self._build_model()
+        if resume and os.path.isfile(MODEL_FILE):
+            print('resuming saved model')
+            self.model = tf.keras.models.load_model(MODEL_FILE, compile=False)
+        else:
+            print('building new model')
+            self.model = self._build_model()
 
     def _build_model(self):
         kernel = self.conf.step
@@ -81,11 +87,11 @@ class YoloTrainer:
 
         return yolo_loss
 
-    def fit(self):
+    def fit(self, epochs):
         with open(TRAINING_FILE, 'r') as f:
             training_phrases = f.read()
         gen = YoloDatasetGenerator(self.conf)
-        data = tf.data.Dataset.from_generator(gen.get_dataset_generator(training_phrases, list_fonts(), augment=False),
+        data = tf.data.Dataset.from_generator(gen.get_dataset_generator(training_phrases, list_fonts(), augment=True),
                                               (tf.float32, tf.float32), (tf.TensorShape(list(self.conf.input_shape)), tf.TensorShape([1, self.conf.grid_count, self.conf.feature_size])))
         # Data augmentation
         # Split train/dev/test sets
@@ -102,7 +108,7 @@ class YoloTrainer:
         model.compile(optimizer='adam', loss=self.get_loss_fn(), metrics=['accuracy'])
         model.summary()
         # train
-        model.fit(train_dataset.batch(64), epochs=50)
+        model.fit(train_dataset.batch(64), epochs=epochs)
         # evaluate on test set
         print("Evaluating test set")
         outs = model.evaluate(test_dataset.batch(64))
@@ -110,13 +116,18 @@ class YoloTrainer:
         print("acc:", outs[1])
         # Save model + parameters
         model.save(MODEL_FILE)
+        # Save configuration
+        encode_conf(self.conf)
 
 
-def main():
-    conf = YoloConfiguration(FEATURES, (FULL_SIZE, 18 * FULL_SIZE, 1), 3)
-    train = YoloTrainer(conf, 2)
-    train.fit()
+def train(epochs, resume=False):
+    if resume:
+        conf = decode_conf()
+    else:
+        conf = YoloConfiguration(FEATURES, (FULL_SIZE, 18 * FULL_SIZE, 1), 3)
+    trainer = YoloTrainer(conf, 2, resume)
+    trainer.fit(epochs)
 
 
 if __name__ == "__main__":
-    main()
+    train(50, True)

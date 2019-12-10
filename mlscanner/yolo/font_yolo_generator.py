@@ -4,35 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 from mlscanner.font_generator import FULL_SIZE, ReScale, TEXT_SIZE, get_font_text_size, RePlace, place_font_image
 from mlscanner.splitchar.char_trainer import FEATURES
 from mlscanner.splitchar.image_splitter import ImageSplitter
-
-
-class YoloConfiguration:
-    def __init__(self, features, input_shape, step):
-        self.features = features
-        self.input_shape = input_shape
-        self.step = step
-        self.grid_count = self.columns // step
-        self.feature_dict = {c: idx for idx, c in enumerate(features)}
-        self.feature_size = len(features) + 3  # +3 for pc, pos & size
-
-    def __str__(self):
-        return f"Yolo configuration will generate {self.input_shape} images with step {self.step} => {self.grid_count} cells"
-
-    @property
-    def lines(self):
-        return self.input_shape[0]
-
-    @property
-    def classes(self):
-        return len(self.features)
-
-    @property
-    def columns(self):
-        return self.input_shape[1]
-
-    @property
-    def image_shape(self):
-        return self.columns, self.lines
+from mlscanner.yolo.yolo_configuration import YoloConfiguration
 
 
 class YoloDatasetGenerator:

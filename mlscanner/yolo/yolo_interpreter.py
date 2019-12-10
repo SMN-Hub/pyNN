@@ -1,28 +1,10 @@
-import json
-
 import numpy as np
 import tensorflow as tf
 
 from mlscanner.font_generator import FULL_SIZE
 from mlscanner.splitchar.char_trainer import FEATURES
-from mlscanner.yolo.font_yolo_generator import YoloConfiguration
+from mlscanner.yolo.yolo_configuration import YoloConfiguration, decode_conf, encode_conf
 from mlscanner.yolo.yolo_trainer import MODEL_FILE
-
-CONF_FILE = '../datasets/yolo_model.conf'
-
-
-def encode_conf(conf):
-    with open(CONF_FILE, 'w') as f:
-        json.dump(conf.__dict__, f)
-
-
-def decode_conf():
-    with open(CONF_FILE, 'r') as f:
-        data = json.load(f)
-    conf = object.__new__(YoloConfiguration)
-    for key, value in data.items():
-        setattr(conf, key, value)
-    return conf
 
 
 class YoloCharacter:
